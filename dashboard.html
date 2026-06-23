@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>ダッシュボード — AVANTIS AI Academy</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="overlay" id="overlay"></div>
+<div class="app-layout">
+  <!-- Sidebar -->
+  <nav class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <div class="sidebar-brand">AVANTIS</div>
+      <div class="sidebar-title">🤖 AI Academy</div>
+      <div class="sidebar-subtitle">AIを使いこなして事業を加速</div>
+    </div>
+    <div class="sidebar-user">
+      <div class="sidebar-avatar" id="avatarLetter">A</div>
+      <div>
+        <div class="sidebar-user-name" id="userName">読み込み中...</div>
+        <div class="sidebar-user-email" id="userEmail"></div>
+      </div>
+    </div>
+    <div class="sidebar-nav">
+      <div class="nav-section">メニュー</div>
+      <a href="dashboard.html" class="nav-item active"><span class="nav-icon">🏠</span>ダッシュボード</a>
+      <div class="nav-section">コース</div>
+      <a href="lesson.html?id=lv1-l1" class="nav-item"><span class="nav-icon">🤖</span>Lv.1 AI入門編</a>
+      <a href="lesson.html?id=lv2-l1" class="nav-item"><span class="nav-icon">✍️</span>Lv.2 プロンプト技術編</a>
+      <a href="lesson.html?id=lv3-l1" class="nav-item"><span class="nav-icon">💻</span>Lv.3 Claude Code編</a>
+      <a href="lesson.html?id=lv4-l1" class="nav-item"><span class="nav-icon">⚡</span>Lv.4 AIプログラミング編</a>
+      <a href="lesson.html?id=lv5-l1" class="nav-item"><span class="nav-icon">🚀</span>Lv.5 一人起業レベル編</a>
+    </div>
+    <div class="sidebar-footer">
+      <a href="setup.html" class="nav-item" id="setupLink" style="display:none"><span class="nav-icon">⚙️</span>管理者設定</a>
+      <button class="nav-item" id="logoutBtn"><span class="nav-icon">🚪</span>ログアウト</button>
+    </div>
+  </nav>
+
+  <!-- Main -->
+  <div class="main-content">
+    <header class="main-header">
+      <button class="hamburger" id="hamburger">☰</button>
+      <h2>ダッシュボード</h2>
+      <div style="font-size:13px;color:var(--text3)" id="todayDate"></div>
+    </header>
+
+    <div class="page-content">
+      <!-- Progress Hero -->
+      <div class="progress-hero">
+        <h3 id="greetingText">おはようございます！</h3>
+        <p>今日も一つ学んで、事業を前に進めましょう。</p>
+        <div class="progress-bar-wrap">
+          <div class="progress-bar" id="mainProgressBar" style="width:0%"></div>
+        </div>
+        <div class="progress-text">全体進捗 <span id="progressFraction">0 / 20</span> レッスン完了</div>
+        <div class="stats-row">
+          <div class="stat-card">
+            <div class="stat-num" id="statLessons">0</div>
+            <div class="stat-label">完了レッスン</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-num" id="statLevels">0</div>
+            <div class="stat-label">クリアレベル</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-num" id="statStreak">—</div>
+            <div class="stat-label">継続中</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Level Cards -->
+      <div class="section-title">📚 コース一覧</div>
+      <div class="levels-grid" id="levelsGrid">
+        <!-- JS で生成 -->
+      </div>
+
+      <!-- Continue Learning -->
+      <div class="section-title">▶️ 続きから学ぶ</div>
+      <div class="lessons-list" id="continueList">
+        <div style="padding:20px;text-align:center;color:var(--text3);font-size:14px">読み込み中...</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { requireAuth, logout, getProfile } from './js/auth.js';
+import { getLessonProgress, getQuizResults } from './js/progress.js';
+import { curriculum, getTotalLessons } from './js/curriculum.js';
+
+// 認証チェック
+let currentUser, profile;
+try {
+  const result = await requireAuth();
+  currentUser = result.user;
+  profile = result.profile;
+} catch { window.location.href = 'index.html'; }
+
+// ユーザー情報表示
+const name = profile?.name || currentUser.email.split('@')[0];
+document.getElementById('userName').textContent = name;
+document.getElementById('userEmail').textContent = currentUser.email;
+document.getElementById('avatarLetter').textContent = name.charAt(0).toUpperCase();
+
+// 管理者メニュー
+if (profile?.role === 'admin') {
+  document.getElementById('setupLink').style.display = 'flex';
+}
+
+// 日付・挨拶
+const now = new Date();
+const hour = now.getHours();
+const greeting = hour < 12 ? 'おはようございます' : hour < 17 ? 'こんにちは' : 'こんばんは';
+document.getElementById('greetingText').textContent = `${greeting}、${name}さん！`;
+document.getElementById('todayDate').textContent = now.toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'short' });
+
+// 進捗読み込み
+const [lessonProgress, quizResults] = await Promise.all([
+  getLessonProgress(currentUser.uid),
+  getQuizResults(currentUser.uid)
+]);
+
+const totalLessons = getTotalLessons();
+const completedCount = Object.values(lessonProgress).filter(l => l.completed).length;
+const pct = Math.round(completedCount / totalLessons * 100);
+
+document.getElementById('mainProgressBar').style.width = pct + '%';
+document.getElementById('progressFraction').innerHTML = `<span>${completedCount}</span> / ${totalLessons}`;
+document.getElementById('statLessons').textContent = completedCount;
+
+let completedLevels = 0;
+for (let i = 1; i <= 5; i++) {
+  const q = quizResults[`quiz-${i}`];
+  if (q && q.score / q.total >= 0.8) completedLevels++;
+}
+document.getElementById('statLevels').textContent = completedLevels;
+document.getElementById('statStreak').textContent = completedCount > 0 ? '学習中' : 'まだ';
+
+// レベルカード生成
+const grid = document.getElementById('levelsGrid');
+curriculum.levels.forEach(lv => {
+  const lessons = curriculum.lessons.filter(l => l.level === lv.id && !l.isQuiz);
+  const done = lessons.filter(l => lessonProgress[l.id]?.completed).length;
+  const pctLv = Math.round(done / lessons.length * 100);
+  const isComplete = quizResults[`quiz-${lv.id}`]?.score / quizResults[`quiz-${lv.id}`]?.total >= 0.8;
+  const firstLesson = lessons[0];
+
+  grid.innerHTML += `
+    <a href="lesson.html?id=${firstLesson.id}" class="level-card ${isComplete ? 'completed' : ''}">
+      <div class="level-badge ${lv.color}">${lv.emoji} Level ${lv.id}${isComplete ? ' ✅' : ''}</div>
+      <h3>${lv.title}</h3>
+      <p>${lv.subtitle}</p>
+      <div class="level-progress">
+        <div class="level-progress-bar"><div class="fill" style="width:${pctLv}%"></div></div>
+        <div class="level-progress-text">${done}/${lessons.length}</div>
+      </div>
+    </a>`;
+});
+
+// 続きから学ぶ
+const continueList = document.getElementById('continueList');
+const incompleteLessons = curriculum.lessons.filter(l => !l.isQuiz && !lessonProgress[l.id]?.completed).slice(0, 5);
+if (incompleteLessons.length === 0) {
+  continueList.innerHTML = '<div style="padding:24px;text-align:center;color:var(--green);font-weight:700">🎉 全レッスン完了！おめでとうございます！</div>';
+} else {
+  continueList.innerHTML = incompleteLessons.map(l => {
+    const lv = curriculum.levels.find(lev => lev.id === l.level);
+    return `<a href="lesson.html?id=${l.id}" class="lesson-item">
+      <div class="lesson-num">${l.level}-${l.order}</div>
+      <div class="lesson-item-info">
+        <div class="lesson-item-title">${l.title}</div>
+        <div class="lesson-item-meta">${lv.title} · ${l.duration}</div>
+      </div>
+      <div class="lesson-status-icon">▶️</div>
+    </a>`;
+  }).join('');
+}
+
+// ハンバーガー
+document.getElementById('hamburger').addEventListener('click', () => {
+  document.getElementById('sidebar').classList.toggle('open');
+  document.getElementById('overlay').classList.toggle('show');
+});
+document.getElementById('overlay').addEventListener('click', () => {
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('overlay').classList.remove('show');
+});
+
+// ログアウト
+document.getElementById('logoutBtn').addEventListener('click', async () => {
+  await logout();
+});
+</script>
+</body>
+</html>

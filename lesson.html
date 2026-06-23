@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>レッスン — AVANTIS AI Academy</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="overlay" id="overlay"></div>
+<div class="app-layout">
+  <nav class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <div class="sidebar-brand">AVANTIS</div>
+      <div class="sidebar-title">🤖 AI Academy</div>
+    </div>
+    <div class="sidebar-user">
+      <div class="sidebar-avatar" id="avatarLetter">A</div>
+      <div>
+        <div class="sidebar-user-name" id="userName">読み込み中...</div>
+      </div>
+    </div>
+    <div class="sidebar-nav">
+      <div class="nav-section">メニュー</div>
+      <a href="dashboard.html" class="nav-item"><span class="nav-icon">🏠</span>ダッシュボード</a>
+      <div class="nav-section">コース</div>
+      <a href="lesson.html?id=lv1-l1" class="nav-item" id="nav-lv1"><span class="nav-icon">🤖</span>Lv.1 AI入門編</a>
+      <a href="lesson.html?id=lv2-l1" class="nav-item" id="nav-lv2"><span class="nav-icon">✍️</span>Lv.2 プロンプト技術編</a>
+      <a href="lesson.html?id=lv3-l1" class="nav-item" id="nav-lv3"><span class="nav-icon">💻</span>Lv.3 Claude Code編</a>
+      <a href="lesson.html?id=lv4-l1" class="nav-item" id="nav-lv4"><span class="nav-icon">⚡</span>Lv.4 AIプログラミング編</a>
+      <a href="lesson.html?id=lv5-l1" class="nav-item" id="nav-lv5"><span class="nav-icon">🚀</span>Lv.5 一人起業レベル編</a>
+    </div>
+    <div class="sidebar-footer">
+      <button class="nav-item" id="logoutBtn"><span class="nav-icon">🚪</span>ログアウト</button>
+    </div>
+  </nav>
+
+  <div class="main-content">
+    <header class="main-header">
+      <button class="hamburger" id="hamburger">☰</button>
+      <h2 id="headerTitle">レッスン</h2>
+      <div></div>
+    </header>
+
+    <div class="page-content">
+      <div class="breadcrumb" id="breadcrumb"></div>
+
+      <div class="lesson-layout" id="lessonLayout">
+        <!-- JS で生成 -->
+      </div>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { requireAuth, logout } from './js/auth.js';
+import { markLessonComplete, isLessonComplete, saveQuizResult, getQuizResults } from './js/progress.js';
+import { getLessonById, getLevelData, getNextLesson, getPrevLesson, curriculum } from './js/curriculum.js';
+
+let currentUser;
+try {
+  const r = await requireAuth();
+  currentUser = r.user;
+  const name = r.profile?.name || currentUser.email.split('@')[0];
+  document.getElementById('userName').textContent = name;
+  document.getElementById('avatarLetter').textContent = name.charAt(0).toUpperCase();
+} catch { window.location.href = 'index.html'; }
+
+const params = new URLSearchParams(location.search);
+const lessonId = params.get('id') || 'lv1-l1';
+const lesson = getLessonById(lessonId);
+
+if (!lesson) {
+  document.getElementById('lessonLayout').innerHTML = '<div class="empty-state"><div class="icon">❓</div><p>レッスンが見つかりません</p></div>';
+  throw new Error('lesson not found');
+}
+
+const levelData = getLevelData(lesson.level);
+document.getElementById('headerTitle').textContent = lesson.title;
+document.getElementById(`nav-lv${lesson.level}`).classList.add('active');
+
+// パンくず
+const bc = document.getElementById('breadcrumb');
+bc.innerHTML = `<a href="dashboard.html">ホーム</a><span class="breadcrumb-sep">›</span><span>${levelData.title}</span><span class="breadcrumb-sep">›</span><span>${lesson.title}</span>`;
+
+const [completed, quizResults] = await Promise.all([
+  isLessonComplete(currentUser.uid, lesson.id),
+  getQuizResults(currentUser.uid)
+]);
+
+const nextLesson = getNextLesson(lesson.id);
+const prevLesson = getPrevLesson(lesson.id);
+
+const layout = document.getElementById('lessonLayout');
+
+if (lesson.isQuiz) {
+  renderQuiz(layout, lesson, quizResults);
+} else {
+  renderLesson(layout, lesson, levelData, completed, nextLesson, prevLesson);
+}
+
+function renderLesson(container, lesson, levelData, completed, next, prev) {
+  container.innerHTML = `
+    <div class="lesson-body">
+      <div class="lesson-header">
+        <div class="lesson-level-badge ${levelData.color}">${levelData.emoji} Level ${lesson.level} — ${levelData.title}</div>
+        <h1 class="lesson-title">${lesson.title}</h1>
+        <div class="lesson-meta">
+          <span>⏱ ${lesson.duration}</span>
+          ${completed ? '<span style="color:var(--green);font-weight:700">✅ 完了済み</span>' : ''}
+        </div>
+      </div>
+      <div class="lesson-content">${lesson.content}</div>
+
+      <div class="action-area">
+        ${!completed ? `<button class="btn btn-primary" id="completeBtn">✅ このレッスンを完了にする</button>` : `<div style="background:var(--green-bg);color:var(--green);padding:14px;border-radius:var(--radius-sm);text-align:center;font-weight:700">✅ 完了済みです！</div>`}
+        <a href="practice.html?id=${lesson.id}" class="btn btn-outline">🤖 AIと練習する</a>
+        <div style="display:flex;gap:8px;margin-top:4px">
+          ${prev ? `<a href="lesson.html?id=${prev.id}" class="btn btn-secondary btn-sm" style="flex:1">← 前のレッスン</a>` : '<div style="flex:1"></div>'}
+          ${next ? `<a href="lesson.html?id=${next.id}" class="btn btn-primary btn-sm" style="flex:1">次のレッスン →</a>` : ''}
+        </div>
+      </div>
+    </div>
+
+    <div class="lesson-sidebar">
+      <div class="sidebar-card">
+        <h4>📋 このレッスンの内容</h4>
+        <div id="tocList"></div>
+      </div>
+      <div class="sidebar-card">
+        <h4>📚 同じレベルのレッスン</h4>
+        <div id="levelLessonList"></div>
+      </div>
+    </div>`;
+
+  // TOC（見出し抽出）
+  const tempDiv = document.createElement('div');
+  tempDiv.innerHTML = lesson.content;
+  const headings = tempDiv.querySelectorAll('h3, h4');
+  const toc = document.getElementById('tocList');
+  headings.forEach(h => {
+    const item = document.createElement('div');
+    item.className = 'toc-item';
+    item.innerHTML = `<div class="toc-dot"></div>${h.textContent}`;
+    toc.appendChild(item);
+  });
+
+  // 同レベルレッスン一覧
+  const levelLessons = curriculum.lessons.filter(l => l.level === lesson.level);
+  const llList = document.getElementById('levelLessonList');
+  levelLessons.forEach(l => {
+    const item = document.createElement('a');
+    item.href = `lesson.html?id=${l.id}`;
+    item.className = 'toc-item';
+    item.style.textDecoration = 'none';
+    item.innerHTML = `<div class="toc-dot" style="${l.id === lesson.id ? 'background:var(--orange)' : ''}"></div>${l.title}`;
+    llList.appendChild(item);
+  });
+
+  // 完了ボタン
+  const completeBtn = document.getElementById('completeBtn');
+  if (completeBtn) {
+    completeBtn.addEventListener('click', async () => {
+      completeBtn.disabled = true;
+      completeBtn.innerHTML = '<span class="spinner"></span> 記録中...';
+      await markLessonComplete(currentUser.uid, lesson.id);
+      completeBtn.outerHTML = `<div style="background:var(--green-bg);color:var(--green);padding:14px;border-radius:var(--radius-sm);text-align:center;font-weight:700">✅ 完了しました！</div>`;
+      if (next) {
+        setTimeout(() => window.location.href = `lesson.html?id=${next.id}`, 1500);
+      }
+    });
+  }
+}
+
+function renderQuiz(container, lesson, quizResults) {
+  const existing = quizResults[lesson.quizId];
+  let html = `
+    <div class="lesson-body" style="max-width:800px">
+      <div class="lesson-header">
+        <div class="lesson-level-badge badge-${lesson.level}">📝 Level ${lesson.level} クイズ</div>
+        <h1 class="lesson-title">${lesson.title}</h1>
+        <div class="lesson-meta"><span>⏱ ${lesson.duration}</span></div>
+      </div>
+      <div class="quiz-header">
+        <h3>理解度チェック</h3>
+        <p>全${lesson.questions.length}問。80%以上（${Math.ceil(lesson.questions.length * 0.8)}問以上）正解でレベルクリアです。</p>
+      </div>
+      <div id="quizQuestions">`;
+
+  lesson.questions.forEach((q, qi) => {
+    html += `<div class="quiz-question" id="q-${qi}">
+      <div class="question-num">問題 ${qi + 1} / ${lesson.questions.length}</div>
+      <div class="question-text">${q.text}</div>
+      <div class="options">
+        ${q.options.map((opt, oi) => `
+          <button class="option-btn" data-q="${qi}" data-o="${oi}" data-correct="${oi === q.correct}">
+            <span class="option-label">${String.fromCharCode(65 + oi)}</span>
+            ${opt}
+          </button>`).join('')}
+      </div>
+    </div>`;
+  });
+
+  html += `</div>
+      <div id="quizSubmitArea" style="margin-top:20px;display:none">
+        <button class="btn btn-primary" id="submitQuiz">採点する</button>
+      </div>
+      <div id="quizResult"></div>`;
+
+  if (existing) {
+    html += `<div style="margin-top:16px;padding:12px 16px;background:var(--bg2);border-radius:var(--radius-sm);font-size:13px;color:var(--text2)">
+      前回の結果：${existing.score}/${existing.total}点（${Math.round(existing.score / existing.total * 100)}%）
+    </div>`;
+  }
+
+  html += `<div class="action-area" style="margin-top:24px">
+      ${prevLesson ? `<a href="lesson.html?id=${prevLesson.id}" class="btn btn-secondary">← 前に戻る</a>` : ''}
+      ${nextLesson ? `<a href="lesson.html?id=${nextLesson.id}" class="btn btn-primary">次のレベルへ →</a>` : '<a href="dashboard.html" class="btn btn-primary">🏠 ダッシュボードへ</a>'}
+    </div>
+    </div>`;
+
+  container.innerHTML = html;
+
+  const answers = {};
+  let answered = 0;
+  const total = lesson.questions.length;
+
+  document.querySelectorAll('.option-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const qi = parseInt(btn.dataset.q);
+      if (answers[qi] !== undefined) return;
+      answers[qi] = parseInt(btn.dataset.o);
+      answered++;
+      // 選択ハイライト
+      document.querySelectorAll(`.option-btn[data-q="${qi}"]`).forEach(b => b.disabled = true);
+      btn.classList.add('selected');
+      if (answered === total) document.getElementById('quizSubmitArea').style.display = 'block';
+    });
+  });
+
+  document.getElementById('submitQuiz')?.addEventListener('click', async () => {
+    let score = 0;
+    lesson.questions.forEach((q, qi) => {
+      const isCorrect = answers[qi] === q.correct;
+      if (isCorrect) score++;
+      document.querySelectorAll(`.option-btn[data-q="${qi}"]`).forEach(b => {
+        const optIdx = parseInt(b.dataset.o);
+        if (optIdx === q.correct) b.classList.add('correct');
+        else if (optIdx === answers[qi]) b.classList.add('wrong');
+      });
+    });
+
+    await saveQuizResult(currentUser.uid, lesson.quizId, score, total);
+    const pct = Math.round(score / total * 100);
+    const pass = pct >= 80;
+    document.getElementById('quizResult').innerHTML = `
+      <div class="quiz-result">
+        <div class="result-score">${score}<span> / ${total}問</span></div>
+        <div class="result-message ${pass ? 'result-pass' : 'result-fail'}">
+          ${pass ? '🎉 レベルクリア！素晴らしい！' : '📚 もう一度レッスンを復習しましょう'}
+        </div>
+        <p style="font-size:14px;color:var(--text2)">正解率：${pct}%</p>
+        ${pass && nextLesson ? `<a href="lesson.html?id=${nextLesson.id}" class="btn btn-primary" style="margin-top:16px">次のレベルへ →</a>` : ''}
+      </div>`;
+    document.getElementById('submitQuiz').style.display = 'none';
+  });
+}
+
+// ハンバーガー
+document.getElementById('hamburger').addEventListener('click', () => {
+  document.getElementById('sidebar').classList.toggle('open');
+  document.getElementById('overlay').classList.toggle('show');
+});
+document.getElementById('overlay').addEventListener('click', () => {
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('overlay').classList.remove('show');
+});
+document.getElementById('logoutBtn').addEventListener('click', async () => { await logout(); });
+</script>
+</body>
+</html>

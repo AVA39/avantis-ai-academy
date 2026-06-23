@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>AVANTIS AI Academy — ログイン</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="auth-wrap">
+  <div class="auth-card">
+    <div class="auth-logo">
+      <div class="brand">AVANTIS</div>
+      <h1>🤖 AI Academy</h1>
+      <div class="tagline">AIを使いこなして、事業を加速する</div>
+    </div>
+    <h2>ログイン</h2>
+    <div id="alertBox"></div>
+    <form id="loginForm">
+      <div class="form-group">
+        <label for="email">メールアドレス</label>
+        <input type="email" id="email" placeholder="your@email.com" required autocomplete="email">
+      </div>
+      <div class="form-group">
+        <label for="password">パスワード</label>
+        <input type="password" id="password" placeholder="••••••••" required autocomplete="current-password">
+      </div>
+      <button type="submit" class="btn btn-primary" id="loginBtn">
+        ログイン
+      </button>
+    </form>
+    <p style="text-align:center;margin-top:16px;font-size:13px;color:var(--text3)">
+      アカウントをお持ちでない方は管理者にご連絡ください
+    </p>
+  </div>
+</div>
+
+<script type="module">
+import { login, onAuth } from './js/auth.js';
+
+// すでにログイン済みならダッシュボードへ
+onAuth(user => {
+  if (user) window.location.href = 'dashboard.html';
+});
+
+const form = document.getElementById('loginForm');
+const alertBox = document.getElementById('alertBox');
+const loginBtn = document.getElementById('loginBtn');
+
+function showAlert(msg, type = 'error') {
+  alertBox.innerHTML = `<div class="alert alert-${type}">${msg}</div>`;
+}
+
+form.addEventListener('submit', async e => {
+  e.preventDefault();
+  const email = document.getElementById('email').value.trim();
+  const password = document.getElementById('password').value;
+  loginBtn.disabled = true;
+  loginBtn.innerHTML = '<span class="spinner"></span> ログイン中...';
+  try {
+    await login(email, password);
+    window.location.href = 'dashboard.html';
+  } catch (err) {
+    const msgs = {
+      'auth/invalid-credential': 'メールアドレスまたはパスワードが間違っています',
+      'auth/user-not-found': 'このメールアドレスは登録されていません',
+      'auth/wrong-password': 'パスワードが間違っています',
+      'auth/too-many-requests': 'ログイン試行が多すぎます。しばらく待ってから再試行してください',
+    };
+    showAlert(msgs[err.code] || 'ログインに失敗しました: ' + err.message);
+    loginBtn.disabled = false;
+    loginBtn.textContent = 'ログイン';
+  }
+});
+</script>
+</body>
+</html>

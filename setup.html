@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>管理者設定 — AVANTIS AI Academy</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="auth-wrap">
+  <div class="auth-card" style="max-width:560px">
+    <div class="auth-logo">
+      <div class="brand">AVANTIS AI Academy</div>
+      <h1>⚙️ 初期設定ガイド</h1>
+      <div class="tagline">管理者向けセットアップ</div>
+    </div>
+
+    <div id="alertBox"></div>
+
+    <!-- Step 1: Firebase -->
+    <div class="setup-step">
+      <div class="step-num">1</div>
+      <div class="step-content">
+        <h4>Firebaseプロジェクトの作成</h4>
+        <ul>
+          <li><a href="https://console.firebase.google.com/" target="_blank" style="color:var(--navy2)">console.firebase.google.com</a> でプロジェクト作成</li>
+          <li>Authentication → メール/パスワード を有効化</li>
+          <li>Firestore Database → 本番モードで作成</li>
+          <li>プロジェクト設定 → Webアプリ追加 → 設定オブジェクトをコピー</li>
+          <li><span class="code-inline">js/firebase-config.js</span> の <span class="code-inline">firebaseConfig</span> を書き換える</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Step 2: Firestoreルール -->
+    <div class="setup-step">
+      <div class="step-num">2</div>
+      <div class="step-content">
+        <h4>Firestoreセキュリティルールの設定</h4>
+        <p>Firestoreコンソール → ルール タブに以下を貼り付け：</p>
+        <div class="code-block" style="font-size:11px;margin-top:8px">
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{db}/documents {
+    match /config/{doc} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null &&
+        get(/databases/$(db)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+    match /progress/{userId}/{col}/{doc} {
+      allow read, write: if request.auth.uid == userId;
+    }
+    match /users/{userId} {
+      allow read, write: if request.auth.uid == userId;
+    }
+  }
+}</div>
+      </div>
+    </div>
+
+    <!-- Step 3: 管理者アカウント作成 -->
+    <div class="setup-step">
+      <div class="step-num">3</div>
+      <div class="step-content">
+        <h4>管理者アカウントの作成</h4>
+        <p>Firebaseコンソール → Authentication → ユーザーを追加</p>
+        <p style="margin-top:8px">作成後、Firestoreで <span class="code-inline">users/{uid}</span> ドキュメントに以下を手動追加：</p>
+        <div class="code-block" style="font-size:12px;margin-top:8px">{ "role": "admin", "name": "小島陸哉" }</div>
+      </div>
+    </div>
+
+    <!-- Step 4: Claude APIキー -->
+    <div class="setup-step">
+      <div class="step-num">4</div>
+      <div class="step-content">
+        <h4>Claude APIキーの登録</h4>
+        <p><a href="https://console.anthropic.com/" target="_blank" style="color:var(--navy2)">console.anthropic.com</a> でAPIキーを作成し、以下に入力してください：</p>
+        <div class="form-group" style="margin-top:12px">
+          <label for="apiKeyInput">Claude APIキー（sk-ant-...）</label>
+          <input type="password" id="apiKeyInput" placeholder="sk-ant-api03-..." autocomplete="off">
+        </div>
+        <button class="btn btn-primary" id="saveApiKeyBtn">APIキーを保存</button>
+        <div id="apiKeyStatus" style="margin-top:8px;font-size:13px"></div>
+      </div>
+    </div>
+
+    <!-- Step 5: 社員招待 -->
+    <div class="setup-step">
+      <div class="step-num">5</div>
+      <div class="step-content">
+        <h4>社員アカウントの作成</h4>
+        <p>Firebaseコンソール → Authentication → ユーザーを追加</p>
+        <p style="margin-top:4px">社員には <span class="code-inline">role: "employee"</span> を設定（初回ログイン時に自動作成）</p>
+        <div class="form-group" style="margin-top:12px">
+          <label>ホスティングURL（社員に共有）</label>
+          <input type="text" id="siteUrl" placeholder="https://your-academy.netlify.app" readonly
+            style="background:var(--bg2);cursor:pointer" onclick="this.select()">
+        </div>
+      </div>
+    </div>
+
+    <div style="text-align:center;margin-top:8px;display:flex;gap:10px;flex-direction:column">
+      <a href="dashboard.html" class="btn btn-primary">✅ 設定完了！ダッシュボードへ</a>
+      <a href="index.html" class="btn btn-secondary">ログイン画面へ戻る</a>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { requireAuth } from './js/auth.js';
+import { saveApiKey, getApiKey } from './js/progress.js';
+
+let currentUser;
+try {
+  const r = await requireAuth('index.html');
+  currentUser = r.user;
+  if (r.profile?.role !== 'admin') {
+    alert('この画面は管理者のみアクセスできます');
+    window.location.href = 'dashboard.html';
+  }
+} catch { window.location.href = 'index.html'; }
+
+// 現在のAPIキー確認
+const existingKey = await getApiKey();
+if (existingKey) {
+  document.getElementById('apiKeyStatus').innerHTML =
+    '<span style="color:var(--green)">✅ APIキーは登録済みです（更新する場合は入力してください）</span>';
+}
+
+document.getElementById('siteUrl').value = location.origin + '/';
+
+// APIキー保存
+document.getElementById('saveApiKeyBtn').addEventListener('click', async () => {
+  const key = document.getElementById('apiKeyInput').value.trim();
+  if (!key.startsWith('sk-ant-')) {
+    document.getElementById('alertBox').innerHTML = '<div class="alert alert-error">APIキーの形式が正しくありません（sk-ant-で始まるキーを入力）</div>';
+    return;
+  }
+  document.getElementById('saveApiKeyBtn').disabled = true;
+  document.getElementById('saveApiKeyBtn').innerHTML = '<span class="spinner"></span> 保存中...';
+  try {
+    await saveApiKey(currentUser.uid, key);
+    document.getElementById('apiKeyStatus').innerHTML = '<span style="color:var(--green)">✅ APIキーを保存しました！</span>';
+    document.getElementById('alertBox').innerHTML = '<div class="alert alert-success">APIキーを保存しました。AI練習チャット機能が使えるようになりました。</div>';
+    document.getElementById('apiKeyInput').value = '';
+  } catch (err) {
+    document.getElementById('alertBox').innerHTML = `<div class="alert alert-error">保存に失敗しました: ${err.message}</div>`;
+  }
+  document.getElementById('saveApiKeyBtn').disabled = false;
+  document.getElementById('saveApiKeyBtn').textContent = 'APIキーを保存';
+});
+</script>
+</body>
+</html>
