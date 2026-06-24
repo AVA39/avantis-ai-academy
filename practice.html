@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>AI練習チャット — AVANTIS AI Academy</title>
-<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="style.css">
 </head>
 <body>
 <div class="overlay" id="overlay"></div>
@@ -73,9 +73,9 @@
 </div>
 
 <script type="module">
-import { requireAuth, logout } from './js/auth.js';
-import { getApiKey } from './js/progress.js';
-import { getLessonById } from './js/curriculum.js';
+import { requireAuth, logout } from './auth.js';
+import { getApiKey } from './progress.js';
+import { getLessonById } from './curriculum.js';
 
 let currentUser, apiKey, systemPrompt;
 let history = [];

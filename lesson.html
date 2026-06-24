@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>レッスン — AVANTIS AI Academy</title>
-<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="style.css">
 </head>
 <body>
 <div class="overlay" id="overlay"></div>
@@ -53,9 +53,9 @@
 </div>
 
 <script type="module">
-import { requireAuth, logout } from './js/auth.js';
-import { markLessonComplete, isLessonComplete, saveQuizResult, getQuizResults } from './js/progress.js';
-import { getLessonById, getLevelData, getNextLesson, getPrevLesson, curriculum } from './js/curriculum.js';
+import { requireAuth, logout } from './auth.js';
+import { markLessonComplete, isLessonComplete, saveQuizResult, getQuizResults } from './progress.js';
+import { getLessonById, getLevelData, getNextLesson, getPrevLesson, curriculum } from './curriculum.js';
 
 let currentUser;
 try {
